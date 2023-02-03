@@ -2,22 +2,24 @@
 """
 Read functions for measurement values of the HTE301 Sensor via I2c interface.
 
-Copyright 2022 E+E Elektronik Ges.m.b.H.
+Copyright 2023 E+E Elektronik Ges.m.b.H.
 
-Disclaimer:
-This application example is non-binding and does not claim to be complete with regard
-to configuration and equipment as well as all eventualities. The application example
-is intended to provide assistance with the HTE301 sensor module design-in and is provided "as is".
-You yourself are responsible for the proper operation of the products described.
-This application example does not release you from the obligation to handle the product safely
-during application, installation, operation and maintenance. By using this application example,
-you acknowledge that we cannot be held liable for any damage beyond the liability regulations
-described.
+DDisclaimer:
+This application example is non-binding and does not claim to be complete with
+regard to configuration and equipment as well as all eventualities. The
+application example is intended to provide assistance with the HTE301 sensor
+module design-in and is provided "as is".You yourself are responsible for the
+proper operation of the products described. This application example does not
+release you from the obligation to handle the product safely during
+application, installation, operation and maintenance. By using this application
+example, you acknowledge that we cannot be held liable for any damage beyond
+the liability regulations described.
 
-We reserve the right to make changes to this application example at any time without notice.
-In case of discrepancies between the suggestions in this application example and other E+E
-publications, such as catalogues, the content of the other documentation takes precedence.
-We assume no liability for the information contained in this document.
+We reserve the right to make changes to this application example at any time
+without notice. In case of discrepancies between the suggestions in this
+application example and other E+E publications, such as catalogues, the content
+of the other documentation takes precedence. We assume no liability for
+the information contained in this document.
 """
 
 
@@ -26,7 +28,35 @@ from smbus2 import SMBus, i2c_msg
 # pylint: enable=E0401
 CRC8_ONEWIRE_POLY = 0x31
 CRC8_ONEWIRE_START = 0xFF
-
+HTE301_COMMAND_READ_SINGLE_SHOT_HIGH_EN = 0x2C06 #EN = clock stretching enabled
+HTE301_COMMAND_READ_SINGLE_SHOT_MEDIUM_EN = 0x2C0D #EN = clock stretching enabled
+HTE301_COMMAND_READ_SINGLE_SHOT_LOW_EN = 0x2C10 #EN = clock stretching enabled
+HTE301_COMMAND_READ_SINGLE_SHOT_HIGH_DIS = 0x2C00 #DIS = clock stretching disabled
+HTE301_COMMAND_READ_SINGLE_SHOT_MEDIUM_DIS = 0x2C0B #DIS = clock stretching disabled
+HTE301_COMMAND_READ_SINGLE_SHOT_LOW_DIS = 0x2C16 #DIS = clock stretching disabled
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_0_5_HIGH = 0x2032
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_0_5_MEDIUM = 0x2024
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_0_5_LOW = 0x202F
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_1_HIGH = 0x2130
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_1_MEDIUM = 0x2126
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_1_LOW = 0x212D
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_2_HIGH = 0x2236
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_2_MEDIUM = 0x2220
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_2_LOW = 0x222B
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_4_HIGH = 0x2334
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_4_MEDIUM = 0x2322
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_4_LOW = 0x2329
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_10_HIGH = 0x2737
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_10_MEDIUM = 0x2721
+HTE301_COMMAND_START_PERIODIC_MEASUREMENT_10_LOW = 0x272A
+HTE301_COMMAND_READ_PERIODIC_MEASUREMENT = 0xE000
+HTE301_COMMAND_CLEAR_REGISTER = 0x3041
+HTE301_COMMAND_READ_REGISTER = 0xF32D
+HTE301_COMMAND_END_PERIODIC_MEASUREMENT = 0x3093
+HTE301_COMMAND_SOFT_RESET = 0x30A2
+HTE301_COMMAND_HEATER_ON = 0x306D
+HTE301_COMMAND_HEATER_OFF = 0x3066
+HTE301_COMMAND_READ_IDENTIFICATION = 0x7029
 
 def get_status_string(status_code):
     """Return string from status_code."""
@@ -63,16 +93,21 @@ class HTE301():
     def __init__(self, i2c_address):
         self.i2c_address = i2c_address
 
-
-    def get_single_shot_temp_hum(self, repeatability):  # repeatability: 0 = low, 1 = medium, 2 = high;
+    def get_single_shot_temp_hum(self, repeatability):  #repeatability: 0 = low,1 = medium,2 = high;
         """Let the sensor take a measurement and return the temperature and humidity values."""
-        if (repeatability == 0):
-            i2c_response = self.wire_write_read([0x2C, 0x10],6)
-        elif (repeatability == 1):
-            i2c_response = self.wire_write_read([0x2C, 0x0D],6)
+        if repeatability == 0:
+            i2c_response = self.wire_write_read(
+                [(HTE301_COMMAND_READ_SINGLE_SHOT_LOW_EN >> 8),
+                 (HTE301_COMMAND_READ_SINGLE_SHOT_LOW_EN & 0xFF)], 6)
+        elif repeatability == 1:
+            i2c_response = self.wire_write_read(
+                [(HTE301_COMMAND_READ_SINGLE_SHOT_MEDIUM_EN >> 8),
+                 (HTE301_COMMAND_READ_SINGLE_SHOT_MEDIUM_EN & 0xFF)], 6)
         else:
-            i2c_response = self.wire_write_read([0x2C, 0x06],6)
-            
+            i2c_response = self.wire_write_read(
+                [(HTE301_COMMAND_READ_SINGLE_SHOT_HIGH_EN >> 8),
+                 (HTE301_COMMAND_READ_SINGLE_SHOT_HIGH_EN & 0xFF)], 6)
+
         if (i2c_response[2] == calc_crc8(i2c_response, 0, 2)) & (i2c_response[5] ==
             calc_crc8(i2c_response, 3, 5)):
             temperature = -45 + 175 * ((float)(i2c_response[0]) * 256 + i2c_response[1]) / 65535
@@ -81,16 +116,21 @@ class HTE301():
         else:
             raise Warning(get_status_string(2))
 
-
-    def get_single_shot_temp_hum_clock_stretching_disabled(self, repeatability):  # repeatability: 0 = low, 1 = medium, 2 = high;
+    def get_single_shot_temp_hum_clock_stretching_disabled(self, repeatability):  # repeatability:0 = low,1 = medium,2 = high
         """Let the sensor take a measurement and return the temperature and humidity values."""
-        if (repeatability == 0):
-            i2c_response = self.wire_write_read([0x24, 0x10],6)
-        elif (repeatability == 1):
-            i2c_response = self.wire_write_read([0x24, 0x0D],6)
+        if repeatability == 0:
+            i2c_response = self.wire_write_read(
+                [(HTE301_COMMAND_READ_SINGLE_SHOT_LOW_DIS >> 8),
+                 (HTE301_COMMAND_READ_SINGLE_SHOT_LOW_DIS & 0xFF)], 6)
+        elif repeatability == 1:
+            i2c_response = self.wire_write_read(
+                [(HTE301_COMMAND_READ_SINGLE_SHOT_MEDIUM_DIS >> 8),
+                 (HTE301_COMMAND_READ_SINGLE_SHOT_MEDIUM_DIS & 0xFF)], 6)
         else:
-            i2c_response = self.wire_write_read([0x24, 0x06],6)
-            
+            i2c_response = self.wire_write_read(
+                [(HTE301_COMMAND_READ_SINGLE_SHOT_HIGH_DIS >> 8),
+                 (HTE301_COMMAND_READ_SINGLE_SHOT_HIGH_DIS & 0xFF)], 6)
+
         if (i2c_response[2] == calc_crc8(i2c_response, 0, 2)) & (i2c_response[5] ==
             calc_crc8(i2c_response, 3, 5)):
             temperature = -45 + 175 * ((float)(i2c_response[0]) * 256 + i2c_response[1]) / 65535
@@ -98,11 +138,12 @@ class HTE301():
             return temperature, humidity
         else:
             raise Warning(get_status_string(2))
-
 
     def get_periodic_measurement_temp_hum(self):
         """Get the last measurement from the periodic measurement for temperature and humidity"""
-        i2c_response = self.wire_write_read([0xE0, 0x00],6)
+        i2c_response = self.wire_write_read(
+            [(HTE301_COMMAND_READ_PERIODIC_MEASUREMENT >> 8),
+             (HTE301_COMMAND_READ_PERIODIC_MEASUREMENT & 0xFF)], 6)
         if (i2c_response[2] == calc_crc8(i2c_response, 0, 2)) & (i2c_response[5] ==
             calc_crc8(i2c_response, 3, 5)):
             temperature = -45 + 175 * ((float)(i2c_response[0]) * 256 + i2c_response[1]) / 65535
@@ -111,111 +152,126 @@ class HTE301():
         else:
             raise Warning(get_status_string(2))
 
-
-
-    def change_periodic_measurement_time(self, milli_sec):
-        """chnage the time between measuremnts in the periodic measurement mode"""
-        if  milli_sec < 3276751:
-            value = milli_sec/50
-            send_bytes = [0,0]
-            send_bytes[1] = int(value / 255)
-            send_bytes[0] = int(value % 256)
-            self.wire_write([0x72,0xA7,0x10,send_bytes[0],send_bytes[1],
-                             calc_crc8([0x10, send_bytes[0],send_bytes[1]],0,3)])
-        else:
-            raise Warning(get_status_string(4))
-
-
-
     def start_periodic_measurement(self, measurement_per_seconds, repeatability): # measurementPerSeconds: 0 = 0.5 mps, 1 = 1mps, 2 = 2mps, 3 = 4mps, 4 = 10mps;  repeatability: 0 = low, 1 = medium, 2 = high;
-        """starts the periodic measurement"""        
-        if (measurement_per_seconds == 0):
-            if(repeatability == 0):
-                self.wire_write([0x20, 0x2F])
-            elif (repeatability == 1):
-                self.wire_write([0x20, 0x24])
+        """starts the periodic measurement"""
+        if measurement_per_seconds == 0:
+            if repeatability == 0:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_0_5_LOW >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_0_5_LOW & 0xFF)])
+            elif repeatability == 1:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_0_5_MEDIUM >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_0_5_MEDIUM & 0xFF)])
             else:
-                self.wire_write([0x20, 0x32])
-        if (measurement_per_seconds == 1):
-            if(repeatability == 0):
-                self.wire_write([0x21, 0x2D])
-            elif (repeatability == 1):
-                self.wire_write([0x21, 0x26])
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_0_5_HIGH >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_0_5_HIGH & 0xFF)])
+        if measurement_per_seconds == 1:
+            if repeatability == 0:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_1_LOW >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_1_LOW & 0xFF)])
+            elif repeatability == 1:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_1_MEDIUM >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_1_MEDIUM & 0xFF)])
             else:
-                self.wire_write([0x21, 0x30])
-        if (measurement_per_seconds == 2):
-            if(repeatability == 0):
-                self.wire_write([0x22, 0x2B])
-            elif (repeatability == 1):
-                self.wire_write([0x22, 0x20])
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_1_HIGH >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_1_HIGH & 0xFF)])
+        if measurement_per_seconds == 2:
+            if repeatability == 0:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_2_LOW >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_2_LOW & 0xFF)])
+            elif repeatability == 1:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_2_MEDIUM >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_2_MEDIUM & 0xFF)])
             else:
-                self.wire_write([0x22, 0x36])      
-        if (measurement_per_seconds == 3):
-            if(repeatability == 0):
-                self.wire_write([0x23, 0x29])
-            elif (repeatability == 1):
-                self.wire_write([0x23, 0x22])
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_2_HIGH >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_2_HIGH & 0xFF)])
+        if measurement_per_seconds == 3:
+            if repeatability == 0:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_4_LOW >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_4_LOW & 0xFF)])
+            elif repeatability == 1:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_4_MEDIUM >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_4_MEDIUM & 0xFF)])
             else:
-                self.wire_write([0x23, 0x34])
-        if (measurement_per_seconds == 4):
-            if(repeatability == 0):
-                self.wire_write([0x27, 0x2A])
-            elif (repeatability == 1):
-                self.wire_write([0x27, 0x21])
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_4_HIGH >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_4_HIGH & 0xFF)])
+        if measurement_per_seconds == 4:
+            if repeatability == 0:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_10_LOW >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_10_LOW & 0xFF)])
+            elif repeatability == 1:
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_10_MEDIUM >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_10_MEDIUM & 0xFF)])
             else:
-                self.wire_write([0x27, 0x37]) 
-
+                self.wire_write(
+                    [(HTE301_COMMAND_START_PERIODIC_MEASUREMENT_10_HIGH >> 8),
+                     (HTE301_COMMAND_START_PERIODIC_MEASUREMENT_10_HIGH & 0xFF)])
 
     def end_periodic_measurement(self):
         """ends the periodic measurement"""
-        self.wire_write([0x30,0x93])
-
+        self.wire_write([(HTE301_COMMAND_END_PERIODIC_MEASUREMENT >> 8),
+                         (HTE301_COMMAND_END_PERIODIC_MEASUREMENT & 0xFF)])
 
     def heater_on(self):
         """turns the heater on """
-        self.wire_write([0x30,0x6D])
-
+        self.wire_write([(HTE301_COMMAND_HEATER_ON >> 8),
+                         (HTE301_COMMAND_HEATER_ON & 0xFF)])
 
     def heater_off(self):
         """turns the heater off"""
-        self.wire_write([0x30,0x66])
-
+        self.wire_write([(HTE301_COMMAND_HEATER_OFF >> 8),
+                         (HTE301_COMMAND_HEATER_OFF & 0xFF)])
 
     def read_identification(self):
         """reads the identification number"""
-        i2c_response = self.wire_write_read([0x70,0x29],9)
+        i2c_response = self.wire_write_read(
+            [(HTE301_COMMAND_READ_IDENTIFICATION >> 8),
+             (HTE301_COMMAND_READ_IDENTIFICATION & 0xFF)], 9)
         if i2c_response[8] == calc_crc8(i2c_response, 0, 8):
             return i2c_response
         else:
             raise Warning(get_status_string(2))
 
-
     def reset(self):
         """resets the sensor"""
-        self.wire_write([0x30,0xA2])
-
+        self.wire_write([(HTE301_COMMAND_SOFT_RESET >> 8),
+                         (HTE301_COMMAND_SOFT_RESET & 0xFF)])
 
     def i2c_reset(self):
-        """resets all the sensor"""
+        """resets all the sensors"""
         write_command = i2c_msg.write(0x00, 0x06)
         with SMBus(1) as hte301_communication:
             hte301_communication.i2c_rdwr(write_command)
 
-
-
     def constant_heater_on_off(self):
         """get the informatio if the heater is on or off"""
-        i2c_response = self.wire_write_read([0xF3,0x2D],3)
+        i2c_response = self.wire_write_read(
+            [(HTE301_COMMAND_READ_REGISTER >> 8),
+             (HTE301_COMMAND_READ_REGISTER & 0xFF)], 3)
         if i2c_response[2] == calc_crc8(i2c_response, 0, 2):
-            i2c_response[0] = (i2c_response [0] << 2) & 255
-            return  i2c_response[0] >> 7
+            i2c_response[0] = (i2c_response[0] << 2) & 255
+            return i2c_response[0] >> 7
         else:
             raise Warning(get_status_string(2))
 
-
     def read_statusregister_1(self):
         """read statusregister 1"""
-        i2c_response = self.wire_write_read([0xF3, 0x2D],3)
+        i2c_response = self.wire_write_read(
+            [(HTE301_COMMAND_READ_REGISTER >> 8),
+             (HTE301_COMMAND_READ_REGISTER & 0xFF)], 3)
         if i2c_response[2] == calc_crc8(i2c_response, 0, 2):
             return i2c_response[0]
         else:
@@ -223,26 +279,26 @@ class HTE301():
 
     def read_statusregister_2(self):
         """read statusregister 2"""
-        i2c_response = self.wire_write_read([0xF3, 0x2D],3)
+        i2c_response = self.wire_write_read(
+            [(HTE301_COMMAND_READ_REGISTER >> 8),
+             (HTE301_COMMAND_READ_REGISTER & 0xFF)], 3)
         if i2c_response[2] == calc_crc8(i2c_response, 0, 2):
             return i2c_response[1]
         else:
             raise Warning(get_status_string(2))
 
-
     def clear_statusregister_1(self):
         """clear the statusregister 1"""
-        self.wire_write([0x30,0x41])
-
+        self.wire_write([(HTE301_COMMAND_CLEAR_REGISTER >> 8),
+                         (HTE301_COMMAND_CLEAR_REGISTER & 0xFF)])
 
     def wire_write_read(self,  buf, receiving_bytes):
         """write a command to the sensor to get different answers like temperature values,..."""
         write_command = i2c_msg.write(self.i2c_address, buf)
         read_command = i2c_msg.read(self.i2c_address, receiving_bytes)
         with SMBus(1) as hte301_communication:
-            hte301_communication.i2c_rdwr(write_command,read_command)
+            hte301_communication.i2c_rdwr(write_command, read_command)
         return list(read_command)
-
 
     def wire_write(self, buf):
         """write to the sensor"""
